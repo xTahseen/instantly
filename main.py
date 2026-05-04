@@ -9,18 +9,33 @@ from aiogram.types import Message, FSInputFile
 from aiogram.filters import CommandStart
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+import logging
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+LOG_CHAT_ID = os.getenv("LOG_CHAT_ID")
 
 INSTAGRAM_API = "https://api.delirius.store/download/instagram?url="
 TIKTOK_API = "https://api.delirius.store/download/tiktok?url="
 YOUTUBE_API = "https://api.delirius.store/download/ytmp4?url="  # ✅ Added
 
+# Basic console logger
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
+
+# Convert LOG_CHAT_ID to int if provided
+if LOG_CHAT_ID:
+    try:
+        LOG_CHAT_ID = int(LOG_CHAT_ID)
+    except ValueError:
+        logger.warning("LOG_CHAT_ID environment variable is not a valid integer. Logging to Telegram disabled.")
+        LOG_CHAT_ID = None
+
 
 dp = Dispatcher()
 
@@ -191,6 +206,41 @@ async def downloader(message: Message):
             await status.edit_text("❌ Nothing downloaded.")
             return
 
+        # Inform log group (if configured)
+        try:
+            if LOG_CHAT_ID:
+                user = message.from_user
+                username = f"@{user.username}" if getattr(user, 'username', None) else ''
+                first = getattr(user, 'first_name', '') or ''
+                last = getattr(user, 'last_name', '') or ''
+                fullname = (first + ' ' + last).strip() or 'Unknown'
+
+                total_files = len(downloaded_files)
+                details_lines = []
+                total_size = 0
+                for fp, mtype in downloaded_files:
+                    try:
+                        sz = os.path.getsize(fp)
+                    except OSError:
+                        sz = 0
+                    total_size += sz
+                    details_lines.append(f"- {os.path.basename(fp)} ({mtype}) — {sz // 1024} KB")
+
+                msg = (
+                    f"📥 <b>Download</b>\n"
+                    f"User: <b>{fullname}</b> {username}\n"
+                    f"User ID: <code>{user.id}</code>\n"
+                    f"URL: {url}\n"
+                    f"Files: {total_files}\n"
+                    f"Total size: {total_size // 1024} KB\n"
+                    f"Details:\n{chr(10).join(details_lines)}"
+                )
+
+                await bot.send_message(LOG_CHAT_ID, msg)
+                logger.info(f"Logged download to chat {LOG_CHAT_ID}: user_id={user.id} url={url} files={total_files}")
+        except Exception as e:
+            logger.exception(f"Failed to send log message to LOG_CHAT_ID: {e}")
+
         await status.edit_text("⬆ Uploading...")
 
         for file_path, media_type in downloaded_files:
@@ -231,7 +281,7 @@ async def downloader(message: Message):
         await message.reply(f"❌ Error: {e}")
 
 async def main():
-    print("🚀 Bot started")
+    logger.info("🚀 Bot started")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
