@@ -15,9 +15,9 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 LOG_CHAT_ID = os.getenv("LOG_CHAT_ID")
 
-INSTAGRAM_API = "https://api.delirius.store/download/instagram?url="
-TIKTOK_API = "https://api.delirius.store/download/tiktok?url="
-YOUTUBE_API = "https://api.delirius.store/download/ytmp4?url="  # ✅ Added
+INSTAGRAM_API = "https://api.delirius.online/download/instagram?url="
+TIKTOK_API = "https://api.delirius.online/download/tiktok?url="
+YOUTUBE_API = "https://api.delirius.online/download/ytmp4?url="
 
 # Basic console logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
