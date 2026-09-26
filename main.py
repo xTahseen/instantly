@@ -190,10 +190,6 @@ async def downloader(message: Message):
             await message.reply("❌ Please send a valid Instagram, TikTok, or YouTube link.")
         return
 
-    # If the link was posted inside a forum topic, keep every reply/upload
-    # in that same topic instead of falling back to the group's General tab.
-    thread_id = message.message_thread_id if message.is_topic_message else None
-
     status = await message.reply("⏳ Fetching media...")
 
     try:
@@ -278,21 +274,20 @@ async def downloader(message: Message):
                     await message.answer_video(
                         video=file,
                         thumbnail=thumb_file,
-                        supports_streaming=True,
-                        message_thread_id=thread_id
+                        supports_streaming=True
                     )
 
                     if thumb_file and os.path.exists(thumb):
                         os.remove(thumb)
 
                 elif media_type == "image":
-                    await message.answer_photo(file, message_thread_id=thread_id)
+                    await message.answer_photo(file)
 
                 elif media_type == "audio":
-                    await message.answer_audio(file, message_thread_id=thread_id)
+                    await message.answer_audio(file)
 
                 else:
-                    await message.answer_document(file, message_thread_id=thread_id)
+                    await message.answer_document(file)
 
             except Exception as e:
                 await message.reply(f"❌ Telegram send failed: {e}")
