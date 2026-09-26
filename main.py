@@ -18,6 +18,7 @@ LOG_CHAT_ID = os.getenv("LOG_CHAT_ID")
 INSTAGRAM_API = "https://api.delirius.online/download/instagram?url="
 TIKTOK_API = "https://api.delirius.online/download/tiktok?url="
 YOUTUBE_API = "https://api.delirius.online/download/ytmp4?url="
+FACEBOOK_API = "https://api.delirius.online/download/facebook?url="
 
 SUPPORTED_DOMAINS = (
     "instagram.com",
@@ -26,6 +27,8 @@ SUPPORTED_DOMAINS = (
     "vm.tiktok.com",
     "youtube.com",
     "youtu.be",
+    "facebook.com",
+    "fb.watch",
 )
 
 
@@ -63,8 +66,8 @@ dp = Dispatcher()
 @dp.message(CommandStart())
 async def start_handler(message: Message):
     await message.answer(
-        "👋 <b>Instagram / TikTok / YouTube Downloader</b>\n\n"
-        "Send an Instagram, TikTok, or YouTube link and I will download the media."
+        "👋 <b>Instagram / TikTok / YouTube / Facebook Downloader</b>\n\n"
+        "Send an Instagram, TikTok, YouTube, or Facebook link and I will download the media."
     )
 
 # ✅ Updated to support YouTube
@@ -74,6 +77,9 @@ async def fetch_data(url: str):
 
     elif "youtube.com" in url or "youtu.be" in url:
         api = f"{YOUTUBE_API}{url}"
+
+    elif "facebook.com" in url or "fb.watch" in url:
+        api = f"{FACEBOOK_API}{url}"
 
     else:
         api = f"{INSTAGRAM_API}{url}"
@@ -133,6 +139,17 @@ def parse_media(api_json, original_url: str):
             out.append({"url": download_url, "type": "video"})
         return out
 
+    # 📘 Facebook handling
+    if "facebook.com" in original_url or "fb.watch" in original_url:
+        items = api_json.get("list", [])
+        if not items:
+            return out
+        chosen = next((i for i in items if "720" in (i.get("quality") or "")), items[0])
+        murl = chosen.get("url")
+        if murl:
+            out.append({"url": murl, "type": "video"})
+        return out
+
     data = api_json.get("data")
 
     if isinstance(data, list):
@@ -187,7 +204,7 @@ async def downloader(message: Message):
         # In private chats, guide the user. In groups, stay silent so the
         # bot doesn't spam every normal message that isn't a link.
         if message.chat.type == "private":
-            await message.reply("❌ Please send a valid Instagram, TikTok, or YouTube link.")
+            await message.reply("❌ Please send a valid Instagram, TikTok, YouTube, or Facebook link.")
         return
 
     status = await message.reply("⏳ Fetching media...")
