@@ -4,7 +4,7 @@ import os
 import uuid
 import subprocess
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, FSInputFile
 from aiogram.filters import CommandStart
 from aiogram.enums import ParseMode
@@ -18,6 +18,27 @@ LOG_CHAT_ID = os.getenv("LOG_CHAT_ID")
 INSTAGRAM_API = "https://api.delirius.online/download/instagram?url="
 TIKTOK_API = "https://api.delirius.online/download/tiktok?url="
 YOUTUBE_API = "https://api.delirius.online/download/ytmp4?url="
+
+SUPPORTED_DOMAINS = (
+    "instagram.com",
+    "tiktok.com",
+    "tiktokcdn.com",
+    "vm.tiktok.com",
+    "youtube.com",
+    "youtu.be",
+)
+
+
+def extract_url(text: str):
+    """Find the first supported link anywhere inside a message/caption,
+    so it also works when the link is surrounded by other text in a group."""
+    if not text:
+        return None
+    for token in text.split():
+        if token.startswith("http://") or token.startswith("https://"):
+            if any(domain in token for domain in SUPPORTED_DOMAINS):
+                return token
+    return None
 
 # Basic console logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -157,18 +178,21 @@ def parse_media(api_json, original_url: str):
 
     return out
 
-@dp.message()
+@dp.message(F.text | F.caption)
 async def downloader(message: Message):
-    url = (message.text or "").strip()
+    text = message.text or message.caption or ""
+    url = extract_url(text)
 
     if not url:
-        await message.reply("❌ Please send a valid link.")
+        # In private chats, guide the user. In groups, stay silent so the
+        # bot doesn't spam every normal message that isn't a link.
+        if message.chat.type == "private":
+            await message.reply("❌ Please send a valid Instagram, TikTok, or YouTube link.")
         return
 
-    # ✅ Updated validation (added YouTube)
-    if ("instagram.com" not in url) and ("tiktok" not in url) and ("youtube.com" not in url) and ("youtu.be" not in url):
-        await message.reply("❌ Please send a valid Instagram, TikTok, or YouTube link.")
-        return
+    # If the link was posted inside a forum topic, keep every reply/upload
+    # in that same topic instead of falling back to the group's General tab.
+    thread_id = message.message_thread_id if message.is_topic_message else None
 
     status = await message.reply("⏳ Fetching media...")
 
@@ -254,20 +278,21 @@ async def downloader(message: Message):
                     await message.answer_video(
                         video=file,
                         thumbnail=thumb_file,
-                        supports_streaming=True
+                        supports_streaming=True,
+                        message_thread_id=thread_id
                     )
 
                     if thumb_file and os.path.exists(thumb):
                         os.remove(thumb)
 
                 elif media_type == "image":
-                    await message.answer_photo(file)
+                    await message.answer_photo(file, message_thread_id=thread_id)
 
                 elif media_type == "audio":
-                    await message.answer_audio(file)
+                    await message.answer_audio(file, message_thread_id=thread_id)
 
                 else:
-                    await message.answer_document(file)
+                    await message.answer_document(file, message_thread_id=thread_id)
 
             except Exception as e:
                 await message.reply(f"❌ Telegram send failed: {e}")
