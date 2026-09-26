@@ -73,7 +73,7 @@ async def fetch_data(url: str):
         api = f"{TIKTOK_API}{url}"
 
     elif "youtube.com" in url or "youtu.be" in url:
-        api = f"{YOUTUBE_API}{url}&format=720"
+        api = f"{YOUTUBE_API}{url}"
 
     else:
         api = f"{INSTAGRAM_API}{url}"
